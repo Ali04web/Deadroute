@@ -1,0 +1,49 @@
+/* app/globals.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --dead: #ef4444;
+  --dead-muted: rgba(239, 68, 68, 0.15);
+  --alive: #22c55e;
+  --alive-muted: rgba(34, 197, 94, 0.12);
+  --warn: #f59e0b;
+  --warn-muted: rgba(245, 158, 11, 0.15);
+  --surface: #111113;
+  --surface-raised: #18181b;
+  --border: rgba(255, 255, 255, 0.07);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-feature-settings: "rlig" 1, "calt" 1;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+
+/* Code/mono */
+.font-mono { font-family: "JetBrains Mono", "Fira Code", ui-monospace, monospace; }
+
+/* Method badges */
+.badge-GET    { @apply bg-emerald-500/15 text-emerald-400 border border-emerald-500/25; }
+.badge-POST   { @apply bg-blue-500/15 text-blue-400 border border-blue-500/25; }
+.badge-PUT    { @apply bg-amber-500/15 text-amber-400 border border-amber-500/25; }
+.badge-PATCH  { @apply bg-purple-500/15 text-purple-400 border border-purple-500/25; }
+.badge-DELETE { @apply bg-red-500/15 text-red-400 border border-red-500/25; }
+
+/* Dead route row highlight */
+.row-dead {
+  background: linear-gradient(90deg, rgba(239,68,68,0.04) 0%, transparent 100%);
+}
+
+/* Animated skull pulse for dead routes */
+@keyframes skull-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.skull-pulse { animation: skull-pulse 2s ease-in-out infinite; }

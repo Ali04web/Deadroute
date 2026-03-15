@@ -1,0 +1,181 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Auth ────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  passwordHash  String?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  projects  Project[]
+  accounts  Account[]
+  sessions  Session[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─── Projects ────────────────────────────────────────────
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  slug        String   @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  apiKeys   ApiKey[]
+  endpoints Endpoint[]
+  alerts    Alert[]
+
+  @@index([userId])
+}
+
+model ApiKey {
+  id        String    @id @default(cuid())
+  key       String    @unique
+  name      String    @default("Default")
+  lastUsed  DateTime?
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+// ─── Endpoints ───────────────────────────────────────────
+
+model Endpoint {
+  id         String   @id @default(cuid())
+  method     String   // GET, POST, PUT, DELETE, PATCH, etc.
+  path       String   // /api/v1/users/:id (normalized)
+  rawPath    String   // /api/v1/users/123 (last seen raw path)
+  framework  String?  // express, fastapi, flask, django, rails
+  firstSeen  DateTime @default(now())
+  lastSeen   DateTime @default(now())
+  totalHits  Int      @default(0)
+  isDead     Boolean  @default(false)
+  isFlagged  Boolean  @default(false)
+  isIgnored  Boolean  @default(false)
+  deadSince  DateTime?
+
+  // Thresholds (overrides project defaults if set)
+  deadThresholdDays Int?
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  hits Hit[]
+  tags EndpointTag[]
+
+  @@unique([projectId, method, path])
+  @@index([projectId])
+  @@index([lastSeen])
+  @@index([isDead])
+}
+
+model Hit {
+  id           String   @id @default(cuid())
+  timestamp    DateTime @default(now())
+  statusCode   Int?
+  durationMs   Int?     // response time in ms
+  userAgent    String?
+  ip           String?
+
+  endpointId String
+  endpoint   Endpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@index([endpointId])
+  @@index([timestamp])
+}
+
+model EndpointTag {
+  id   String @id @default(cuid())
+  name String
+
+  endpointId String
+  endpoint   Endpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@unique([endpointId, name])
+}
+
+// ─── Alerts ──────────────────────────────────────────────
+
+model Alert {
+  id          String      @id @default(cuid())
+  name        String
+  type        AlertType
+  channel     AlertChannel
+  destination String      // email / slack webhook / discord webhook
+  thresholdDays Int       @default(30)
+  isActive    Boolean     @default(true)
+  lastFired   DateTime?
+  createdAt   DateTime    @default(now())
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+enum AlertType {
+  ENDPOINT_DEAD
+  ENDPOINT_INACTIVE
+  COVERAGE_DROP
+}
+
+enum AlertChannel {
+  EMAIL
+  SLACK
+  DISCORD
+}
