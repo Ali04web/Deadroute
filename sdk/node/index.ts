@@ -7,22 +7,13 @@
 //   import { deadroute } from 'deadroute-node'
 //   app.use(deadroute({ apiKey: 'dr_live_...', ingestUrl: 'https://yourapp.com/api/ingest' }))
 
-
-
 export interface DeadRouteOptions {
-  /** Your project API key (starts with dr_live_) */
   apiKey: string;
-  /** URL of your DeadRoute ingest endpoint */
   ingestUrl?: string;
-  /** Batch size before flushing to the server (default: 50) */
   batchSize?: number;
-  /** Flush interval in ms (default: 5000) */
   flushInterval?: number;
-  /** Sampling rate 0–1 (default: 1 = 100%) */
   sampleRate?: number;
-  /** Paths to exclude (regex array) */
   exclude?: RegExp[];
-  /** Framework hint e.g. 'express', 'fastify', 'koa' */
   framework?: string;
 }
 
@@ -50,33 +41,20 @@ class DeadRouteClient {
       framework: "express",
       ...opts,
     };
-
-    // Auto-flush on interval
     this.flushTimer = setInterval(() => this.flush(), this.opts.flushInterval);
-
-    // Flush on process exit
     process.on("beforeExit", () => this.flush());
   }
 
   record(hit: HitPayload) {
-    // Sampling
     if (Math.random() > this.opts.sampleRate) return;
-
-    // Exclude patterns
     if (this.opts.exclude.some((re) => re.test(hit.path))) return;
-
     this.queue.push(hit);
-
-    if (this.queue.length >= this.opts.batchSize) {
-      this.flush();
-    }
+    if (this.queue.length >= this.opts.batchSize) this.flush();
   }
 
   async flush() {
     if (this.queue.length === 0) return;
-
     const hits = this.queue.splice(0);
-
     try {
       await fetch(this.opts.ingestUrl, {
         method: "POST",
@@ -87,7 +65,6 @@ class DeadRouteClient {
         body: JSON.stringify({ hits }),
       });
     } catch {
-      // Silently fail — never impact your app's performance
       if (process.env.NODE_ENV === "development") {
         console.warn("[DeadRoute] Failed to flush hits. Check your ingestUrl and apiKey.");
       }
@@ -100,26 +77,12 @@ class DeadRouteClient {
   }
 }
 
-// Singleton client
 let _client: DeadRouteClient | null = null;
 
-/**
- * Express/Connect middleware factory.
- *
- * @example
- * import express from 'express'
- * import { deadroute } from 'deadroute-node'
- *
- * const app = express()
- * app.use(deadroute({
- *   apiKey: process.env.DEADROUTE_API_KEY!,
- *   ingestUrl: process.env.DEADROUTE_INGEST_URL,
- * }))
- */
 export function deadroute(opts: DeadRouteOptions) {
   _client = new DeadRouteClient(opts);
 
-  return function deadrouteMiddleware(req: Request, _res: Response, next: NextFunction) {
+  return function deadrouteMiddleware(req: any, _res: any, next: any) {
     const start = Date.now();
     const path = req.path || req.url || "/";
     const method = req.method?.toUpperCase() ?? "GET";
@@ -139,22 +102,8 @@ export function deadroute(opts: DeadRouteOptions) {
   };
 }
 
-/**
- * Fastify plugin.
- *
- * @example
- * import Fastify from 'fastify'
- * import { fastifyDeadRoute } from 'deadroute-node'
- *
- * const app = Fastify()
- * await app.register(fastifyDeadRoute, { apiKey: '...' })
- */
-export async function fastifyDeadRoute(
-  fastify: any,
-  opts: DeadRouteOptions
-) {
+export async function fastifyDeadRoute(fastify: any, opts: DeadRouteOptions) {
   const client = new DeadRouteClient({ framework: "fastify", ...opts });
-
   fastify.addHook("onResponse", async (request: any, reply: any) => {
     client.record({
       method: request.method,
@@ -167,23 +116,8 @@ export async function fastifyDeadRoute(
   });
 }
 
-/**
- * Next.js middleware (edge-compatible).
- * Place in middleware.ts at the project root.
- *
- * @example
- * // middleware.ts
- * import { NextRequest, NextResponse } from 'next/server'
- * import { nextDeadRoute } from 'deadroute-node'
- *
- * export function middleware(req: NextRequest) {
- *   nextDeadRoute(req, { apiKey: process.env.DEADROUTE_API_KEY! })
- *   return NextResponse.next()
- * }
- */
 export function nextDeadRoute(req: any, opts: DeadRouteOptions) {
   if (!_client) _client = new DeadRouteClient({ framework: "nextjs", ...opts });
-
   _client.record({
     method: req.method ?? "GET",
     path: req.nextUrl?.pathname ?? req.url,
