@@ -7,7 +7,7 @@
 //   import { deadroute } from 'deadroute-node'
 //   app.use(deadroute({ apiKey: 'dr_live_...', ingestUrl: 'https://yourapp.com/api/ingest' }))
 
-import type { Request, Response, NextFunction } from "express";
+
 
 export interface DeadRouteOptions {
   /** Your project API key (starts with dr_live_) */
